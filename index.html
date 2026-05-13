@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>萝卜大法 - 攀岩训练记录</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#1a1a2e;--surface:#16213e;--card:#0f3460;--primary:#e94560;--accent:#533483;--text:#eee;--text-muted:#aaa;--green:#4caf50;--yellow:#ffc107;--red:#f44336;--border:#2a2a4a}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:80px}
+.container{max-width:480px;margin:0 auto;padding:16px}
+h1{font-size:1.4rem;text-align:center;padding:12px 0;color:var(--primary)}
+h2{font-size:1.1rem;margin:16px 0 8px}
+h3{font-size:1rem;margin:8px 0;color:var(--text-muted)}
+.card{background:var(--surface);border-radius:12px;padding:16px;margin-bottom:12px;border:1px solid var(--border)}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:12px 20px;border:none;border-radius:8px;font-size:1rem;font-weight:500;cursor:pointer;min-height:44px;transition:opacity .2s}
+.btn:active{opacity:.7}
+.btn-primary{background:var(--primary);color:#fff;width:100%}
+.btn-secondary{background:var(--card);color:var(--text);border:1px solid var(--border)}
+.btn-small{padding:8px 14px;font-size:.85rem;min-height:36px}
+.btn-danger{background:var(--red);color:#fff}
+.btn-success{background:var(--green);color:#fff}
+input,select,textarea{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:1rem;min-height:44px}
+textarea{min-height:60px;resize:vertical}
+select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23aaa' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+label{display:block;font-size:.85rem;color:var(--text-muted);margin-bottom:4px;margin-top:10px}
+.form-row{display:flex;gap:8px;align-items:flex-end}
+.form-row>*{flex:1}
+.tab-bar{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:100}
+.tab-bar button{flex:1;padding:10px 4px;border:none;background:none;color:var(--text-muted);font-size:.7rem;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
+.tab-bar button.active{color:var(--primary)}
+.tab-bar button svg{width:22px;height:22px}
+.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:.75rem;font-weight:600}
+.badge-green{background:var(--green);color:#fff}
+.badge-yellow{background:var(--yellow);color:#000}
+.badge-red{background:var(--red);color:#fff}
+.status-bar{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.stat-card{flex:1;min-width:80px;background:var(--card);border-radius:8px;padding:10px;text-align:center}
+.stat-card .num{font-size:1.5rem;font-weight:700;color:var(--primary)}
+.stat-card .label{font-size:.7rem;color:var(--text-muted);margin-top:2px}
+.route-item{background:var(--card);border-radius:8px;padding:12px;margin-bottom:8px}
+.route-header{display:flex;justify-content:space-between;align-items:center}
+.timer{font-size:2rem;font-weight:700;text-align:center;padding:16px;font-variant-numeric:tabular-nums}
+.timer.warning{color:var(--yellow)}
+.timer.danger{color:var(--red)}
+.hidden{display:none!important}
+.alert{padding:12px;border-radius:8px;margin-bottom:12px;font-size:.9rem}
+.alert-warning{background:rgba(255,193,7,.15);border:1px solid var(--yellow);color:var(--yellow)}
+.alert-info{background:rgba(83,52,131,.3);border:1px solid var(--accent);color:#ccc}
+.alert-success{background:rgba(76,175,80,.15);border:1px solid var(--green);color:var(--green)}
+.history-item{display:flex;justify-content:space-between;align-items:center;padding:12px;cursor:pointer;border-bottom:1px solid var(--border)}
+.history-item:active{background:var(--card);border-radius:8px}
+.chart{font-family:monospace;font-size:.8rem;line-height:1.4;color:var(--text-muted);padding:8px;background:var(--card);border-radius:8px;white-space:pre;overflow-x:auto}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:flex-end;justify-content:center}
+.modal{background:var(--surface);border-radius:16px 16px 0 0;padding:20px;width:100%;max-width:480px;max-height:80vh;overflow-y:auto}
+.chip-group{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.chip{padding:6px 12px;border-radius:16px;font-size:.85rem;cursor:pointer;border:1px solid var(--border);background:var(--bg);color:var(--text)}
+.chip.active{background:var(--primary);border-color:var(--primary);color:#fff}
+.delete-btn{color:var(--red);background:none;border:none;font-size:1.2rem;cursor:pointer;padding:4px 8px}
+.back-btn{background:none;border:none;color:var(--text-muted);font-size:1rem;cursor:pointer;padding:8px 0;margin-bottom:8px}
+</style>
+</head>
+<body>
+<div class="container" id="app"></div>
+<nav class="tab-bar" id="tabBar">
+<button data-tab="home" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 001 1h3m10-11v10a1 1 0 01-1 1h-3m-6 0a1 1 0 01-1-1v-4a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1"/></svg>首页</button>
+<button data-tab="record"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>记录</button>
+<button data-tab="history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>历史</button>
+<button data-tab="routes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h7"/></svg>线路库</button>
+<button data-tab="stats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>统计</button>
+</nav>
+<script>
+const STORAGE_KEY = 'luobo_training_data';
+const GRADES = ['5.9','5.10a','5.10b','5.10c','5.10d','5.11a','5.11b','5.11c','5.11d','5.12a','5.12b','5.12c','5.12d','5.13a','5.13b','5.13c','5.13d','5.14a','5.14b','5.14c','5.14d'];
+
+function uuid(){return Date.now().toString(36)+Math.random().toString(36).slice(2)}
+function loadData(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||{sessions:[],routeLibrary:[]}}catch(e){return{sessions:[],routeLibrary:[]}}}
+function saveData(d){localStorage.setItem(STORAGE_KEY,JSON.stringify(d))}
+function today(){return new Date().toISOString().slice(0,10)}
+function daysBetween(a,b){return Math.floor((new Date(b)-new Date(a))/86400000)}
+
+let data = loadData();
+let currentTab = 'home';
+let editingSession = null;
+let timerInterval = null;
+let timerSeconds = 0;
+let timerRunning = false;
+let viewingSessionId = null;
+
+const app = document.getElementById('app');
+const tabBar = document.getElementById('tabBar');
+
+tabBar.addEventListener('click', e => {
+  const btn = e.target.closest('button[data-tab]');
+  if(!btn) return;
+  currentTab = btn.dataset.tab;
+  tabBar.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  viewingSessionId = null;
+  render();
+});
+
+function render(){
+  if(viewingSessionId) return renderSessionDetail();
+  switch(currentTab){
+    case 'home': renderHome(); break;
+    case 'record': renderRecord(); break;
+    case 'history': renderHistory(); break;
+    case 'routes': renderRoutes(); break;
+    case 'stats': renderStats(); break;
+  }
+}
+
+function getWeekSessions(){
+  const now = new Date();
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - ((now.getDay()+6)%7));
+  monday.setHours(0,0,0,0);
+  return data.sessions.filter(s => new Date(s.date) >= monday);
+}
+
+function getLastSession(){
+  if(!data.sessions.length) return null;
+  return data.sessions.sort((a,b)=>b.date.localeCompare(a.date))[0];
+}
+
+function renderHome(){
+  const weekSessions = getWeekSessions();
+  const weekCount = weekSessions.length;
+  const indoorCount = weekSessions.filter(s=>s.type==='indoor').length;
+  const outdoorCount = weekSessions.filter(s=>s.type==='outdoor').length;
+  const last = getLastSession();
+  const daysSinceLast = last ? daysBetween(last.date, today()) : null;
+
+  let alerts = '';
+  if(weekCount < 2){
+    alerts += '<div class="alert alert-warning">本周训练不足，超量恢复难以积累</div>';
+  }
+  if(daysSinceLast !== null && daysSinceLast > 3){
+    alerts += '<div class="alert alert-info">距上次训练已 '+daysSinceLast+' 天，可以开始下次训练了</div>';
+  } else if(daysSinceLast !== null && daysSinceLast >= 2){
+    alerts += '<div class="alert alert-success">恢复时间充足（'+daysSinceLast+'天），状态应该不错</div>';
+  }
+
+  app.innerHTML = `
+    <h1>🧗 萝卜大法</h1>
+    ${alerts}
+    <div class="status-bar">
+      <div class="stat-card"><div class="num">${weekCount}</div><div class="label">本周训练</div></div>
+      <div class="stat-card"><div class="num">${daysSinceLast !== null ? daysSinceLast+'天' : '-'}</div><div class="label">距上次</div></div>
+      <div class="stat-card"><div class="num">3</div><div class="label">周目标</div></div>
+    </div>
+    <div class="card">
+      <h3>本周详情</h3>
+      <p style="margin-top:8px;color:var(--text-muted)">室内训练: ${indoorCount} 次 | 野攀: ${outdoorCount} 次</p>
+      ${weekCount >= 3 ? '<p style="margin-top:8px;color:var(--green)">✓ 本周训练目标已达成</p>' : '<p style="margin-top:8px;color:var(--text-muted)">还需 '+(3-weekCount)+' 次训练达成周目标</p>'}
+    </div>
+    <button class="btn btn-primary" onclick="currentTab='record';tabBar.querySelectorAll('button').forEach(b=>b.classList.remove('active'));tabBar.querySelector('[data-tab=record]').classList.add('active');render()">开始新训练</button>
+  `;
+}
+
+function renderRecord(){
+  if(editingSession){
+    renderEditSession();
+    return;
+  }
+  app.innerHTML = `
+    <h1>新建训练</h1>
+    <div class="card">
+      <label>日期</label>
+      <input type="date" id="sessionDate" value="${today()}">
+      <label>训练类型</label>
+      <div class="chip-group">
+        <div class="chip active" data-type="indoor" onclick="selectType(this)">室内训练</div>
+        <div class="chip" data-type="outdoor" onclick="selectType(this)">野攀</div>
+      </div>
+      <div id="outdoorNote" class="hidden">
+        <label>野攀备注</label>
+        <textarea id="outdoorNoteText" placeholder="记录地点、天气、攀爬情况..."></textarea>
+      </div>
+      <div style="margin-top:16px">
+        <button class="btn btn-primary" onclick="startSession()">开始记录</button>
+      </div>
+    </div>
+  `;
+}
+
+function selectType(el){
+  el.parentElement.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  const noteDiv = document.getElementById('outdoorNote');
+  if(el.dataset.type==='outdoor') noteDiv.classList.remove('hidden');
+  else noteDiv.classList.add('hidden');
+}
+
+function startSession(){
+  const date = document.getElementById('sessionDate').value;
+  const type = document.querySelector('.chip.active').dataset.type;
+  if(type==='outdoor'){
+    const note = document.getElementById('outdoorNoteText').value;
+    const session = {id:uuid(),date,type:'outdoor',totalDuration:0,note,warmup:[],sets:[]};
+    data.sessions.push(session);
+    saveData(data);
+    editingSession = null;
+    currentTab = 'history';
+    tabBar.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+    tabBar.querySelector('[data-tab=history]').classList.add('active');
+    render();
+    return;
+  }
+  editingSession = {id:uuid(),date,type:'indoor',totalDuration:0,note:'',warmup:[],sets:[{setNumber:1,duration:0,routes:[]},{setNumber:2,duration:0,routes:[]}]};
+  render();
+}
+
+function renderEditSession(){
+  const s = editingSession;
+  let warmupHtml = s.warmup.map((w,i)=>`
+    <div class="route-item">
+      <div class="route-header">
+        <span>${w.routeName||'热身线路 '+(i+1)} <span class="badge badge-green">${w.grade}</span></span>
+        <button class="delete-btn" onclick="removeWarmup(${i})">×</button>
+      </div>
+      <span class="badge ${w.completed?'badge-green':'badge-red'}">${w.completed?'完成':'未完成'}</span>
+    </div>
+  `).join('');
+
+  let setsHtml = s.sets.map((set,si)=>{
+    let routesHtml = set.routes.map((r,ri)=>{
+      let statusBadge = r.completionStatus==='completed'?'badge-green':r.completionStatus==='partial'?'badge-yellow':'badge-red';
+      let statusText = r.completionStatus==='completed'?'完成':r.completionStatus==='partial'?r.completionPercent+'%':'未完成';
+      const libRoute = r.routeName ? data.routeLibrary.find(x=>x.name===r.routeName) : null;
+      const thumb = libRoute&&libRoute.image ? '<img src="'+libRoute.image+'" style="width:40px;height:40px;object-fit:cover;border-radius:4px;flex-shrink:0">' : '';
+      return `<div class="route-item">
+        <div style="display:flex;gap:8px;align-items:center">
+          ${thumb}
+          <div style="flex:1;min-width:0">
+            <div class="route-header">
+              <span>${r.routeName||'线路'+(ri+1)} <span class="badge ${statusBadge}">${r.grade}</span></span>
+              <button class="delete-btn" onclick="removeRoute(${si},${ri})">×</button>
+            </div>
+            <span class="badge ${statusBadge}">${statusText}</span>
+            ${r.forearmStatus?'<span style="margin-left:8px;font-size:.8rem;color:var(--text-muted)">小臂:'+r.forearmStatus+'</span>':''}
+            ${r.note?'<p style="font-size:.8rem;color:var(--text-muted);margin-top:4px">'+r.note+'</p>':''}
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+    return `
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <h3>第 ${set.setNumber} 组</h3>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:.85rem;color:var(--text-muted)">${set.routes.length} 条线路</span>
+            ${si >= 2 ? '<button class="delete-btn" onclick="removeSet('+si+')">×</button>' : ''}
+          </div>
+        </div>
+        ${routesHtml}
+        <button class="btn btn-secondary btn-small" style="margin-top:8px;width:100%" onclick="showAddRoute(${si})">+ 添加线路</button>
+      </div>
+    `;
+  }).join('');
+
+  app.innerHTML = `
+    <h1>训练记录中</h1>
+    <div id="timerSection" class="card" style="text-align:center">
+      <div class="timer" id="timerDisplay">${formatTime(timerSeconds)}</div>
+      <div style="display:flex;gap:8px;justify-content:center">
+        <button class="btn btn-secondary btn-small" onclick="toggleTimer()">${timerRunning?'暂停':'开始计时'}</button>
+        <button class="btn btn-secondary btn-small" onclick="resetTimer()">重置</button>
+      </div>
+    </div>
+    <h2>热身</h2>
+    ${warmupHtml}
+    <button class="btn btn-secondary btn-small" onclick="showAddWarmup()">+ 添加热身线路</button>
+    <h2>正式训练</h2>
+    ${setsHtml}
+    <button class="btn btn-secondary btn-small" style="width:100%;margin-bottom:12px" onclick="addNewSet()">+ 添加新组</button>
+    <div class="card">
+      <label>训练备注</label>
+      <textarea id="sessionNote" placeholder="今天感受如何？">${s.note||''}</textarea>
+      <label>总时长（分钟）</label>
+      <input type="number" id="totalDuration" value="${s.totalDuration||''}" placeholder="可选">
+    </div>
+    <button class="btn btn-primary" onclick="saveSession()">保存训练</button>
+    <button class="btn btn-secondary" style="width:100%;margin-top:8px" onclick="cancelSession()">取消</button>
+  `;
+}
+
+function formatTime(sec){
+  const m = Math.floor(sec/60);
+  const s = sec%60;
+  return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+}
+
+function toggleTimer(){
+  if(timerRunning){
+    clearInterval(timerInterval);
+    timerRunning=false;
+  } else {
+    timerRunning=true;
+    timerInterval=setInterval(()=>{
+      timerSeconds++;
+      const el=document.getElementById('timerDisplay');
+      if(el){
+        el.textContent=formatTime(timerSeconds);
+        if(timerSeconds>=900) el.className='timer danger';
+        else if(timerSeconds>=720) el.className='timer warning';
+      }
+    },1000);
+  }
+  render();
+}
+
+function resetTimer(){
+  clearInterval(timerInterval);
+  timerRunning=false;
+  timerSeconds=0;
+  render();
+}
+
+function removeWarmup(i){editingSession.warmup.splice(i,1);render();}
+function removeRoute(si,ri){editingSession.sets[si].routes.splice(ri,1);render();}
+function addNewSet(){editingSession.sets.push({setNumber:editingSession.sets.length+1,duration:0,routes:[]});render();}
+function removeSet(si){editingSession.sets.splice(si,1);editingSession.sets.forEach((s,i)=>s.setNumber=i+1);render();}
+
+function showAddWarmup(){
+  const lib = data.routeLibrary;
+  let libOptions = lib.length ? '<label>从线路库选择</label><select id="libSelect"><option value="">-- 手动输入 --</option>'+lib.map(r=>'<option value="'+r.id+'">'+r.name+' ('+r.grade+')'+(r.location?' - '+r.location:'')+'</option>').join('')+'</select>' : '';
+  const modal = document.createElement('div');
+  modal.className='modal-overlay';
+  modal.innerHTML=`<div class="modal">
+    <h2>添加热身线路</h2>
+    ${libOptions}
+    <label>线路名称</label>
+    <input type="text" id="wName" placeholder="可选">
+    <label>难度</label>
+    <select id="wGrade">${GRADES.map(g=>'<option>'+g+'</option>').join('')}</select>
+    <label>完成状态</label>
+    <div class="chip-group" id="wStatusChips">
+      <div class="chip active" data-v="true">完成</div>
+      <div class="chip" data-v="false">未完成</div>
+    </div>
+    <div style="margin-top:16px;display:flex;gap:8px">
+      <button class="btn btn-primary" id="confirmWarmupBtn">添加</button>
+      <button class="btn btn-secondary" id="cancelWarmupBtn">取消</button>
+    </div>
+  </div>`;
+  modal.querySelector('#wStatusChips').addEventListener('click',e=>{
+    const chip=e.target.closest('.chip');
+    if(chip){
+      modal.querySelectorAll('#wStatusChips .chip').forEach(c=>c.classList.remove('active'));
+      chip.classList.add('active');
+    }
+  });
+  const libSelect=modal.querySelector('#libSelect');
+  if(libSelect){
+    libSelect.addEventListener('change',function(){
+      const r=lib.find(x=>x.id===this.value);
+      if(r){
+        modal.querySelector('#wName').value=r.name;
+        modal.querySelector('#wGrade').value=r.grade;
+      }
+    });
+  }
+  modal.querySelector('#confirmWarmupBtn').addEventListener('click',function(){
+    const name=modal.querySelector('#wName').value;
+    const grade=modal.querySelector('#wGrade').value;
+    const completed=modal.querySelector('#wStatusChips .chip.active').dataset.v==='true';
+    editingSession.warmup.push({routeName:name,grade,completed,duration:5});
+    modal.remove();
+    render();
+  });
+  modal.querySelector('#cancelWarmupBtn').addEventListener('click',function(){modal.remove();});
+  document.body.appendChild(modal);
+}
+
+function showAddRoute(setIndex){
+  const lib = data.routeLibrary;
+  let libOptions = lib.length ? '<label>从线路库选择</label><select id="libSelect"><option value="">-- 手动输入 --</option>'+lib.map(r=>'<option value="'+r.id+'">'+r.name+' ('+r.grade+')'+(r.location?' - '+r.location:'')+'</option>').join('')+'</select>' : '';
+  const isLastRoute = editingSession.sets[setIndex].routes.length >= 3;
+  const modal = document.createElement('div');
+  modal.className='modal-overlay';
+  modal.innerHTML=`<div class="modal">
+    <h2>添加线路 - 第${setIndex+1}组</h2>
+    ${libOptions}
+    <div id="libRoutePreview" class="hidden" style="margin:8px 0;text-align:center"><img id="libPreviewImg" style="max-width:100%;max-height:120px;border-radius:8px"></div>
+    <label>线路名称</label>
+    <input type="text" id="rName" placeholder="可选">
+    <label>难度</label>
+    <select id="rGrade">${GRADES.map((g,i)=>'<option'+(i===10?' selected':'')+'>'+g+'</option>').join('')}</select>
+    <label>完成状态</label>
+    <div class="chip-group" id="statusChips">
+      <div class="chip active" data-v="completed">✅ 完成</div>
+      <div class="chip" data-v="partial">📊 部分完成</div>
+      <div class="chip" data-v="failed">❌ 未完成</div>
+    </div>
+    <div id="partialInput" class="hidden">
+      <label>完成百分比</label>
+      <input type="number" id="rPercent" min="0" max="100" value="80" placeholder="80">
+    </div>
+    <div id="failedInput" class="hidden">
+      <label>掉落位置</label>
+      <div class="chip-group" id="dropChips">
+        <div class="chip active" data-v="开头">开头</div>
+        <div class="chip" data-v="中段">中段</div>
+        <div class="chip" data-v="结尾">结尾</div>
+      </div>
+    </div>
+    <div id="forearmSection" ${isLastRoute?'':'class="hidden"'}>
+      <label>小臂状态</label>
+      <div class="chip-group" id="forearmChips">
+        <div class="chip active" data-v="正常">正常</div>
+        <div class="chip" data-v="微胀">微胀</div>
+        <div class="chip" data-v="明显力竭">明显力竭</div>
+        <div class="chip" data-v="完全力竭">完全力竭</div>
+      </div>
+    </div>
+    <label>备注</label>
+    <input type="text" id="rNote" placeholder="可选">
+    <div style="margin-top:16px;display:flex;gap:8px">
+      <button class="btn btn-primary" id="confirmRouteBtn">添加</button>
+      <button class="btn btn-secondary" id="cancelRouteBtn">取消</button>
+    </div>
+  </div>`;
+
+  modal.querySelector('#statusChips').addEventListener('click',e=>{
+    const chip=e.target.closest('.chip');
+    if(chip){
+      modal.querySelectorAll('#statusChips .chip').forEach(c=>c.classList.remove('active'));
+      chip.classList.add('active');
+      modal.querySelector('#partialInput').classList.toggle('hidden',chip.dataset.v!=='partial');
+      modal.querySelector('#failedInput').classList.toggle('hidden',chip.dataset.v!=='failed');
+    }
+  });
+  const dropChips=modal.querySelector('#dropChips');
+  if(dropChips) dropChips.addEventListener('click',e=>{
+    const chip=e.target.closest('.chip');
+    if(chip){
+      modal.querySelectorAll('#dropChips .chip').forEach(c=>c.classList.remove('active'));
+      chip.classList.add('active');
+    }
+  });
+  modal.querySelector('#forearmChips').addEventListener('click',e=>{
+    const chip=e.target.closest('.chip');
+    if(chip){
+      modal.querySelectorAll('#forearmChips .chip').forEach(c=>c.classList.remove('active'));
+      chip.classList.add('active');
+    }
+  });
+  const libSelect=modal.querySelector('#libSelect');
+  if(libSelect){
+    libSelect.addEventListener('change',function(){
+      const r=lib.find(x=>x.id===this.value);
+      if(r){
+        modal.querySelector('#rName').value=r.name;
+        modal.querySelector('#rGrade').value=r.grade;
+        const preview=modal.querySelector('#libRoutePreview');
+        if(r.image){
+          modal.querySelector('#libPreviewImg').src=r.image;
+          preview.classList.remove('hidden');
+        } else {
+          preview.classList.add('hidden');
+        }
+      } else {
+        modal.querySelector('#libRoutePreview').classList.add('hidden');
+      }
+    });
+  }
+  modal.querySelector('#confirmRouteBtn').addEventListener('click',function(){
+    const name=modal.querySelector('#rName').value;
+    const grade=modal.querySelector('#rGrade').value;
+    const status=modal.querySelector('#statusChips .chip.active').dataset.v;
+    const percent=status==='partial'?parseInt(modal.querySelector('#rPercent').value)||80:status==='completed'?100:0;
+    const drop=status==='failed'?(modal.querySelector('#dropChips .chip.active')||{}).dataset?.v||null:null;
+    const forearm=(modal.querySelector('#forearmSection:not(.hidden) #forearmChips .chip.active')||{}).dataset?.v||null;
+    const note=modal.querySelector('#rNote').value;
+    const route={routeName:name,grade,completionStatus:status,completionPercent:percent,dropPosition:drop,forearmStatus:forearm,note};
+    if(name){
+      const history=getRouteHistory(name);
+      if(history.filter(h=>h.completionStatus==='completed').length>=2){
+        route.note=(route.note?route.note+' | ':'')+'⬆️ 建议升级到更难线路';
+      }
+    }
+    editingSession.sets[setIndex].routes.push(route);
+    modal.remove();
+    render();
+  });
+  modal.querySelector('#cancelRouteBtn').addEventListener('click',function(){modal.remove();});
+  document.body.appendChild(modal);
+}
+
+function getRouteHistory(routeName){
+  let results=[];
+  data.sessions.forEach(s=>{
+    if(s.type!=='indoor')return;
+    s.sets.forEach(set=>{
+      set.routes.forEach(r=>{
+        if(r.routeName===routeName) results.push({...r,date:s.date});
+      });
+    });
+  });
+  return results.sort((a,b)=>a.date.localeCompare(b.date));
+}
+
+function saveSession(){
+  editingSession.note = document.getElementById('sessionNote').value;
+  editingSession.totalDuration = parseInt(document.getElementById('totalDuration').value)||0;
+  data.sessions.push(editingSession);
+  saveData(data);
+  clearInterval(timerInterval);
+  timerRunning=false;
+  timerSeconds=0;
+  editingSession=null;
+  currentTab='history';
+  tabBar.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+  tabBar.querySelector('[data-tab=history]').classList.add('active');
+  render();
+}
+
+function cancelSession(){
+  if(confirm('确定取消？未保存的数据将丢失')){
+    clearInterval(timerInterval);
+    timerRunning=false;
+    timerSeconds=0;
+    editingSession=null;
+    render();
+  }
+}
+
+function renderHistory(){
+  const sessions = [...data.sessions].sort((a,b)=>b.date.localeCompare(a.date));
+  if(!sessions.length){
+    app.innerHTML='<h1>训练历史</h1><div class="card"><p style="text-align:center;color:var(--text-muted)">暂无训练记录</p></div>';
+    return;
+  }
+  let list = sessions.map(s=>{
+    const typeLabel = s.type==='outdoor'?'🏔️ 野攀':'🧗 室内';
+    const routeCount = s.type==='indoor'? s.sets.reduce((sum,set)=>sum+set.routes.length,0) : 0;
+    return `<div class="history-item" onclick="viewSession('${s.id}')">
+      <div>
+        <div style="font-weight:600">${s.date} ${typeLabel}</div>
+        <div style="font-size:.8rem;color:var(--text-muted)">${s.type==='indoor'?routeCount+'条线路'+(s.totalDuration?' | '+s.totalDuration+'分钟':''):s.note||''}</div>
+      </div>
+      <span style="color:var(--text-muted)">›</span>
+    </div>`;
+  }).join('');
+  app.innerHTML=`<h1>训练历史</h1><div class="card" style="padding:0">${list}</div>`;
+}
+
+function viewSession(id){
+  viewingSessionId=id;
+  render();
+}
+
+function renderSessionDetail(){
+  const s = data.sessions.find(x=>x.id===viewingSessionId);
+  if(!s){viewingSessionId=null;render();return;}
+
+  let content='';
+  if(s.type==='outdoor'){
+    content=`<div class="card"><h3>🏔️ 野攀</h3><p style="margin-top:8px">${s.note||'无备注'}</p></div>`;
+  } else {
+    let warmupHtml = s.warmup.length ? s.warmup.map(w=>`<div class="route-item"><span>${w.routeName||'热身'} <span class="badge badge-green">${w.grade}</span></span> <span class="badge ${w.completed?'badge-green':'badge-red'}">${w.completed?'完成':'未完成'}</span></div>`).join('') : '<p style="color:var(--text-muted)">无热身记录</p>';
+
+    let setsHtml = s.sets.map(set=>{
+      let routes = set.routes.map(r=>{
+        let statusBadge = r.completionStatus==='completed'?'badge-green':r.completionStatus==='partial'?'badge-yellow':'badge-red';
+        let statusText = r.completionStatus==='completed'?'完成':r.completionStatus==='partial'?r.completionPercent+'%':'未完成'+(r.dropPosition?' ('+r.dropPosition+')':'');
+        let progress = getRouteProgress(r.routeName, s.date);
+        const libRoute = r.routeName ? data.routeLibrary.find(x=>x.name===r.routeName) : null;
+        const thumb = libRoute&&libRoute.image ? '<img src="'+libRoute.image+'" style="width:48px;height:48px;object-fit:cover;border-radius:6px;flex-shrink:0">' : '';
+        return `<div class="route-item">
+          <div style="display:flex;gap:10px;align-items:flex-start">
+            ${thumb}
+            <div style="flex:1;min-width:0">
+              <div class="route-header"><span style="font-weight:600">${r.routeName||'未命名'} <span class="badge ${statusBadge}">${r.grade}</span></span><span class="badge ${statusBadge}">${statusText}</span></div>
+              ${r.forearmStatus?'<div style="font-size:.8rem;color:var(--text-muted);margin-top:4px">小臂: '+r.forearmStatus+'</div>':''}
+              ${r.note?'<div style="font-size:.8rem;color:var(--text-muted);margin-top:4px">'+r.note+'</div>':''}
+              ${progress?'<div style="font-size:.8rem;color:var(--accent);margin-top:4px">'+progress+'</div>':''}
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+      return `<div class="card"><h3>第 ${set.setNumber} 组</h3>${routes}</div>`;
+    }).join('');
+
+    content=`
+      <div class="card"><h3>热身</h3>${warmupHtml}</div>
+      ${setsHtml}
+      ${s.note?'<div class="card"><h3>备注</h3><p>'+s.note+'</p></div>':''}
+      ${s.totalDuration?'<p style="color:var(--text-muted);font-size:.85rem">总时长: '+s.totalDuration+' 分钟</p>':''}
+    `;
+  }
+
+  app.innerHTML=`
+    <button class="back-btn" onclick="viewingSessionId=null;render()">← 返回</button>
+    <h2>${s.date} ${s.type==='outdoor'?'野攀':'室内训练'}</h2>
+    ${content}
+    <button class="btn btn-danger btn-small" style="margin-top:16px;width:100%" onclick="deleteSession('${s.id}')">删除此记录</button>
+  `;
+}
+
+function getRouteProgress(routeName, currentDate){
+  if(!routeName) return '';
+  const history = getRouteHistory(routeName).filter(h=>h.date < currentDate);
+  if(!history.length) return '';
+  const last = history[history.length-1];
+  let lastStatus = last.completionStatus==='completed'?'完成':last.completionStatus==='partial'?last.completionPercent+'%':'未完成';
+  return '📈 上次('+last.date+'): '+lastStatus;
+}
+
+function deleteSession(id){
+  if(!confirm('确定删除此训练记录？')) return;
+  data.sessions = data.sessions.filter(s=>s.id!==id);
+  saveData(data);
+  viewingSessionId=null;
+  render();
+}
+
+function renderRoutes(){
+  let list = data.routeLibrary.map(r=>`
+    <div class="route-item">
+      <div style="display:flex;gap:10px;align-items:flex-start">
+        ${r.image?'<img src="'+r.image+'" style="width:60px;height:60px;object-fit:cover;border-radius:6px;flex-shrink:0" onclick="previewImage(\''+r.id+'\')">':'<div style="width:60px;height:60px;background:var(--bg);border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1.5rem">🧗</div>'}
+        <div style="flex:1;min-width:0">
+          <div class="route-header">
+            <div>
+              <span style="font-weight:600">${r.name}</span>
+              <span class="badge badge-green" style="margin-left:6px">${r.grade}</span>
+            </div>
+            <button class="delete-btn" onclick="deleteRoute('${r.id}')">×</button>
+          </div>
+          ${r.location?'<div style="font-size:.8rem;color:var(--text-muted);margin-top:2px">📍 '+r.location+'</div>':''}
+          ${r.routeNote?'<div style="font-size:.8rem;color:var(--text-muted);margin-top:2px">💬 '+r.routeNote+'</div>':''}
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  app.innerHTML=`
+    <h1>线路库</h1>
+    ${list||'<div class="card"><p style="text-align:center;color:var(--text-muted)">暂无保存的线路</p></div>'}
+    <div class="card">
+      <h3>添加新线路</h3>
+      <label>线路名称</label>
+      <input type="text" id="newRouteName" placeholder="线路名称">
+      <label>难度</label>
+      <select id="newRouteGrade">${GRADES.map(g=>'<option>'+g+'</option>').join('')}</select>
+      <label>所在位置</label>
+      <select id="newRouteLocation" onchange="toggleAreaSelect()">
+        <option value="">手动输入</option>
+        <option value="岩石攀登中心（西三旗）">岩石攀登中心（西三旗）</option>
+      </select>
+      <div id="customLocationWrap" class="hidden">
+        <label>自定义位置</label>
+        <input type="text" id="customLocation" placeholder="岩馆/区域">
+      </div>
+      <div id="areaSelectWrap" class="hidden">
+        <label>线路区域</label>
+        <select id="newRouteArea">
+          <option value="">不选择</option>
+          <option value="E区顶绳区">E区顶绳区</option>
+          <option value="A区青少年比赛区">A区青少年比赛区</option>
+          <option value="D区自动保护区">D区自动保护区</option>
+          <option value="C区先锋区">C区先锋区</option>
+          <option value="B区比赛区">B区比赛区</option>
+          <option value="速度区">速度区</option>
+        </select>
+      </div>
+      <label>线路备注</label>
+      <input type="text" id="newRouteNote" placeholder="关于这条线路的备注（可选）">
+      <label>线路照片</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="file" id="newRouteImage" accept="image/*" style="display:none" onchange="previewUpload(this)">
+        <button class="btn btn-secondary btn-small" onclick="document.getElementById('newRouteImage').click()">📷 拍照/相册</button>
+        <span id="imageStatus" style="font-size:.8rem;color:var(--text-muted)"></span>
+      </div>
+      <div id="imagePreview" class="hidden" style="margin-top:8px"><img id="previewImg" style="width:100%;max-height:200px;object-fit:contain;border-radius:8px"></div>
+      <button class="btn btn-primary" style="margin-top:12px" onclick="addRoute()">添加到线路库</button>
+    </div>
+  `;
+}
+
+function addRoute(){
+  const name=document.getElementById('newRouteName').value.trim();
+  if(!name){alert('请输入线路名称');return;}
+  const grade=document.getElementById('newRouteGrade').value;
+  const locSelect=document.getElementById('newRouteLocation').value;
+  let location='';
+  if(locSelect){
+    location=locSelect;
+    const area=document.getElementById('newRouteArea').value;
+    if(area) location+=' - '+area;
+  } else {
+    location=(document.getElementById('customLocation')||{}).value||'';
+  }
+  const routeNote=document.getElementById('newRouteNote').value.trim();
+  const previewEl=document.getElementById('imagePreview');
+  const imgEl=document.getElementById('previewImg');
+  const hasImage=previewEl&&!previewEl.classList.contains('hidden')&&imgEl&&imgEl.src;
+  data.routeLibrary.push({id:uuid(),name,grade,location,routeNote,image:hasImage?imgEl.src:''});
+  saveData(data);
+  render();
+}
+
+function previewUpload(input){
+  const file=input.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    document.getElementById('previewImg').src=e.target.result;
+    document.getElementById('imagePreview').classList.remove('hidden');
+    document.getElementById('imageStatus').textContent=file.name;
+  };
+  reader.readAsDataURL(file);
+}
+
+function previewImage(routeId){
+  const r=data.routeLibrary.find(x=>x.id===routeId);
+  if(!r||!r.image)return;
+  const modal=document.createElement('div');
+  modal.className='modal-overlay';
+  modal.style.alignItems='center';
+  modal.innerHTML='<div style="padding:16px;max-width:90vw"><img src="'+r.image+'" style="width:100%;border-radius:8px"><p style="text-align:center;margin-top:8px;color:#fff">'+r.name+' ('+r.grade+')</p></div>';
+  modal.addEventListener('click',()=>modal.remove());
+  document.body.appendChild(modal);
+}
+
+function toggleAreaSelect(){
+  const val=document.getElementById('newRouteLocation').value;
+  document.getElementById('areaSelectWrap').classList.toggle('hidden',!val);
+  document.getElementById('customLocationWrap').classList.toggle('hidden',!!val);
+}
+
+function deleteRoute(id){
+  if(!confirm('确定删除此线路？')) return;
+  data.routeLibrary=data.routeLibrary.filter(r=>r.id!==id);
+  saveData(data);
+  render();
+}
+
+function renderStats(){
+  const now = new Date();
+  const thisMonth = data.sessions.filter(s=>s.date.slice(0,7)===now.toISOString().slice(0,7));
+
+  // Weekly frequency for last 4 weeks
+  let weeklyData=[];
+  for(let i=3;i>=0;i--){
+    const weekStart=new Date(now);
+    weekStart.setDate(now.getDate()-((now.getDay()+6)%7)-i*7);
+    const weekEnd=new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate()+6);
+    const count=data.sessions.filter(s=>{
+      const d=new Date(s.date);
+      return d>=weekStart&&d<=weekEnd;
+    }).length;
+    weeklyData.push({label:'W'+(4-i),count});
+  }
+
+  // ASCII chart
+  const maxCount = Math.max(...weeklyData.map(w=>w.count),3);
+  let chart='';
+  for(let row=maxCount;row>=1;row--){
+    let line=row+'|';
+    weeklyData.forEach(w=>{
+      line += w.count>=row?' ██ ':'    ';
+    });
+    chart+=line+'\n';
+  }
+  chart+=' +'+weeklyData.map(()=>'----').join('')+'\n';
+  chart+='  '+weeklyData.map(w=>' '+w.label+' ').join('');
+
+  // Grade completion stats
+  let gradeStats={};
+  data.sessions.forEach(s=>{
+    if(s.type!=='indoor')return;
+    s.sets.forEach(set=>{
+      set.routes.forEach(r=>{
+        const gradeGroup=r.grade.slice(0,4);
+        if(!gradeStats[gradeGroup]) gradeStats[gradeGroup]={total:0,completed:0};
+        gradeStats[gradeGroup].total++;
+        if(r.completionStatus==='completed') gradeStats[gradeGroup].completed++;
+      });
+    });
+  });
+  let gradeHtml=Object.entries(gradeStats).sort((a,b)=>b[0].localeCompare(a[0])).map(([grade,stat])=>{
+    const pct=Math.round(stat.completed/stat.total*100);
+    const color=pct>=80?'var(--green)':pct>=50?'var(--yellow)':'var(--red)';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
+      <span>${grade}系列</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="width:80px;height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:${pct}%;height:100%;background:${color};border-radius:3px"></div></div>
+        <span style="font-size:.85rem;color:${color}">${pct}%</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Top 3 routes ready for upgrade
+  let routeCompletions={};
+  data.sessions.forEach(s=>{
+    if(s.type!=='indoor')return;
+    s.sets.forEach(set=>{
+      set.routes.forEach(r=>{
+        if(!r.routeName)return;
+        if(!routeCompletions[r.routeName]) routeCompletions[r.routeName]={name:r.routeName,grade:r.grade,completedCount:0,total:0};
+        routeCompletions[r.routeName].total++;
+        if(r.completionStatus==='completed') routeCompletions[r.routeName].completedCount++;
+      });
+    });
+  });
+  let topRoutes=Object.values(routeCompletions).filter(r=>r.completedCount>=2).sort((a,b)=>b.completedCount-a.completedCount).slice(0,3);
+  let topHtml=topRoutes.length?topRoutes.map(r=>`<div class="route-item"><span style="font-weight:600">${r.name}</span> <span class="badge badge-green">${r.grade}</span><div style="font-size:.8rem;color:var(--green);margin-top:4px">连续完成 ${r.completedCount} 次 - 建议升级</div></div>`).join(''):'<p style="color:var(--text-muted)">数据不足</p>';
+
+  app.innerHTML=`
+    <h1>数据统计</h1>
+    <div class="status-bar">
+      <div class="stat-card"><div class="num">${thisMonth.length}</div><div class="label">本月训练</div></div>
+      <div class="stat-card"><div class="num">${data.sessions.length}</div><div class="label">总记录</div></div>
+    </div>
+    <div class="card">
+      <h3>最近4周训练频率</h3>
+      <div class="chart">${chart}</div>
+    </div>
+    <div class="card">
+      <h3>各难度完成率</h3>
+      ${gradeHtml||'<p style="color:var(--text-muted)">暂无数据</p>'}
+    </div>
+    <div class="card">
+      <h3>可考虑升级的线路</h3>
+      ${topHtml}
+    </div>
+    <div class="card">
+      <h3>数据管理</h3>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn btn-secondary btn-small" onclick="exportData()">导出JSON</button>
+        <button class="btn btn-secondary btn-small" onclick="importData()">导入数据</button>
+      </div>
+    </div>
+  `;
+}
+
+function exportData(){
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download='luobo_training_'+today()+'.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData(){
+  const input=document.createElement('input');
+  input.type='file';input.accept='.json';
+  input.onchange=e=>{
+    const file=e.target.files[0];
+    if(!file)return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      try{
+        const imported=JSON.parse(ev.target.result);
+        if(imported.sessions&&imported.routeLibrary){
+          if(confirm('导入将覆盖当前数据，确定继续？')){
+            data=imported;
+            saveData(data);
+            render();
+          }
+        }else{alert('文件格式不正确');}
+      }catch(err){alert('解析失败: '+err.message);}
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+// Initial render
+render();
+</script>
+</body>
+</html>
