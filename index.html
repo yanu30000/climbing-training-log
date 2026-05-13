@@ -79,16 +79,66 @@ label{display:block;font-size:.85rem;color:var(--text-muted);margin-bottom:4px;m
 <button data-tab="stats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>统计</button>
 </nav>
 <script>
-const STORAGE_KEY = 'luobo_training_data';
+const LEGACY_STORAGE_KEY = 'luobo_training_data';
+const REGISTRY_KEY = 'luobo_accounts_registry';
+const SESSION_KEY = 'luobo_current_user_id';
 const GRADES = ['5.9','5.10a','5.10b','5.10c','5.10d','5.11a','5.11b','5.11c','5.11d','5.12a','5.12b','5.12c','5.12d','5.13a','5.13b','5.13c','5.13d','5.14a','5.14b','5.14c','5.14d'];
 
+function dataKeyFor(uid){ return 'luobo_training_data_v2_'+uid }
+function loadRegistry(){
+  try{ return JSON.parse(localStorage.getItem(REGISTRY_KEY))||{users:{}}; }
+  catch(e){ return {users:{}}; }
+}
+function saveRegistry(reg){ localStorage.setItem(REGISTRY_KEY, JSON.stringify(reg)); }
+async function hashPassword(salt, password){
+  const t = salt + '|' + password;
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function randomSalt(){
+  const a = new Uint8Array(16);
+  crypto.getRandomValues(a);
+  return Array.from(a).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function normalizeUsername(name){
+  return String(name||'').trim().toLowerCase().replace(/[^a-z0-9_]/g,'').slice(0,24);
+}
+function emptyData(){ return {sessions:[],routeLibrary:[]}; }
+function loadUserBlob(uid){
+  try{
+    const raw = localStorage.getItem(dataKeyFor(uid));
+    if(!raw) return null;
+    const o = JSON.parse(raw);
+    if(o && Array.isArray(o.sessions) && Array.isArray(o.routeLibrary)) return o;
+  }catch(e){}
+  return null;
+}
+function saveUserBlob(uid, d){ localStorage.setItem(dataKeyFor(uid), JSON.stringify(d)); }
+
+let currentUserId = localStorage.getItem(SESSION_KEY)||'';
+(function(){
+  const reg = loadRegistry();
+  if(currentUserId && !reg.users[currentUserId]){
+    currentUserId = '';
+    localStorage.removeItem(SESSION_KEY);
+  }
+})();
+
+let data = emptyData();
+if(currentUserId){
+  const loaded = loadUserBlob(currentUserId);
+  if(loaded) data = loaded;
+}
+
+function saveData(d){
+  data = d;
+  if(currentUserId) saveUserBlob(currentUserId, data);
+}
+
 function uuid(){return Date.now().toString(36)+Math.random().toString(36).slice(2)}
-function loadData(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||{sessions:[],routeLibrary:[]}}catch(e){return{sessions:[],routeLibrary:[]}}}
-function saveData(d){localStorage.setItem(STORAGE_KEY,JSON.stringify(d))}
 function today(){return new Date().toISOString().slice(0,10)}
 function daysBetween(a,b){return Math.floor((new Date(b)-new Date(a))/86400000)}
 
-let data = loadData();
 let currentTab = 'home';
 let editingSession = null;
 let timerInterval = null;
@@ -110,7 +160,200 @@ tabBar.addEventListener('click', e => {
   render();
 });
 
+function renderAuth(){
+  const reg = loadRegistry();
+  const hasUsers = Object.keys(reg.users).length > 0;
+  const hasLegacy = !!localStorage.getItem(LEGACY_STORAGE_KEY);
+  app.innerHTML = `
+    <h1>🧗 萝卜大法</h1>
+    <div class="card">
+      <p style="color:var(--text-muted);font-size:.9rem;line-height:1.5;margin-bottom:12px">
+        每位用户使用<strong>独立账号</strong>，数据保存在本机浏览器（换设备或清除网站数据不会同步，亦无法找回密码）。
+      </p>
+      ${hasLegacy && !hasUsers ? '<div class="alert alert-info">检测到旧版本地数据，创建首个账号后将自动归入该账号。</div>' : ''}
+      ${hasUsers ? `
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button type="button" class="btn btn-secondary btn-small" style="flex:1" id="authShowLogin">登录</button>
+        <button type="button" class="btn btn-secondary btn-small" style="flex:1" id="authShowReg">注册</button>
+        <button type="button" class="btn btn-secondary btn-small" style="flex:1" id="authShowChgPwd">改密</button>
+      </div>
+      <div id="authLoginPanel">
+        <label>用户名（小写英文、数字、下划线）</label>
+        <input type="text" id="authLoginUser" placeholder="例如 zhangsan" autocomplete="username">
+        <label>密码</label>
+        <input type="password" id="authLoginPass" placeholder="至少 4 位" autocomplete="current-password">
+        <button type="button" class="btn btn-primary" style="margin-top:14px" id="authLoginBtn">进入</button>
+      </div>
+      <div id="authRegPanel" class="hidden">
+        <label>新用户名</label>
+        <input type="text" id="authRegUser" placeholder="拼音或英文，如 lisi" autocomplete="username">
+        <label>密码（至少 4 位）</label>
+        <input type="password" id="authRegPass" autocomplete="new-password">
+        <label>确认密码</label>
+        <input type="password" id="authRegPass2" autocomplete="new-password">
+        <button type="button" class="btn btn-primary" style="margin-top:14px" id="authRegBtn">注册并进入</button>
+      </div>
+      <div id="authChgPwdPanel" class="hidden">
+        <label>用户名</label>
+        <input type="text" id="authChgUser" placeholder="输入已注册的用户名" autocomplete="username">
+        <label>旧密码</label>
+        <input type="password" id="authChgOldPass" autocomplete="current-password">
+        <label>新密码（至少 4 位）</label>
+        <input type="password" id="authChgNewPass" autocomplete="new-password">
+        <label>确认新密码</label>
+        <input type="password" id="authChgNewPass2" autocomplete="new-password">
+        <button type="button" class="btn btn-primary" style="margin-top:14px" id="authChgPwdBtn">修改密码</button>
+      </div>
+      ` : `
+      <h3 style="margin-top:0">创建首个账号</h3>
+      <label>用户名（小写英文、数字、下划线）</label>
+      <input type="text" id="authRegUserOnly" placeholder="例如 zhangsan" autocomplete="username">
+      <label>密码（至少 4 位）</label>
+      <input type="password" id="authRegPassOnly" autocomplete="new-password">
+      <label>确认密码</label>
+      <input type="password" id="authRegPassOnly2" autocomplete="new-password">
+      <button type="button" class="btn btn-primary" style="margin-top:14px" id="authRegOnlyBtn">注册并进入</button>
+      `}
+    </div>
+  `;
+  function showLogin(){
+    app.querySelector('#authLoginPanel')?.classList.remove('hidden');
+    app.querySelector('#authRegPanel')?.classList.add('hidden');
+    app.querySelector('#authChgPwdPanel')?.classList.add('hidden');
+  }
+  function showReg(){
+    app.querySelector('#authLoginPanel')?.classList.add('hidden');
+    app.querySelector('#authRegPanel')?.classList.remove('hidden');
+    app.querySelector('#authChgPwdPanel')?.classList.add('hidden');
+  }
+  function showChgPwd(){
+    app.querySelector('#authLoginPanel')?.classList.add('hidden');
+    app.querySelector('#authRegPanel')?.classList.add('hidden');
+    app.querySelector('#authChgPwdPanel')?.classList.remove('hidden');
+  }
+  if(hasUsers){
+    app.querySelector('#authShowLogin')?.addEventListener('click', showLogin);
+    app.querySelector('#authShowReg')?.addEventListener('click', showReg);
+    app.querySelector('#authShowChgPwd')?.addEventListener('click', showChgPwd);
+    app.querySelector('#authLoginBtn')?.addEventListener('click', async ()=>{
+      const u = normalizeUsername(app.querySelector('#authLoginUser').value);
+      const p = app.querySelector('#authLoginPass').value;
+      if(u.length < 2){ showToast('用户名至少 2 位有效字符'); return; }
+      if(p.length < 4){ showToast('请输入密码'); return; }
+      const r = loadRegistry();
+      const row = r.users[u];
+      if(!row){ showToast('用户不存在'); return; }
+      const h = await hashPassword(row.salt, p);
+      if(h !== row.hash){ showToast('密码错误'); return; }
+      currentUserId = u;
+      localStorage.setItem(SESSION_KEY, u);
+      const loaded = loadUserBlob(u);
+      data = loaded || emptyData();
+      tabBar.classList.remove('hidden');
+      showToast('欢迎回来');
+      render();
+    });
+    app.querySelector('#authRegBtn')?.addEventListener('click', async ()=>{
+      const u = normalizeUsername(app.querySelector('#authRegUser').value);
+      const p = app.querySelector('#authRegPass').value;
+      const p2 = app.querySelector('#authRegPass2').value;
+      if(u.length < 2){ showToast('用户名至少 2 位（请用拼音/英文）'); return; }
+      if(p.length < 4){ showToast('密码至少 4 位'); return; }
+      if(p !== p2){ showToast('两次密码不一致'); return; }
+      const r = loadRegistry();
+      if(r.users[u]){ showToast('用户名已存在'); return; }
+      const salt = randomSalt();
+      const hash = await hashPassword(salt, p);
+      r.users[u] = { salt, hash };
+      saveRegistry(r);
+      let initial = emptyData();
+      const leg = localStorage.getItem(LEGACY_STORAGE_KEY);
+      if(leg){
+        try{
+          const o = JSON.parse(leg);
+          if(o && o.sessions) initial = o;
+        }catch(e){}
+        localStorage.removeItem(LEGACY_STORAGE_KEY);
+      }
+      saveUserBlob(u, initial);
+      currentUserId = u;
+      localStorage.setItem(SESSION_KEY, u);
+      data = initial;
+      tabBar.classList.remove('hidden');
+      showToast('注册成功');
+      render();
+    });
+    app.querySelector('#authChgPwdBtn')?.addEventListener('click', async ()=>{
+      const u = normalizeUsername(app.querySelector('#authChgUser').value);
+      const oldP = app.querySelector('#authChgOldPass').value;
+      const newP = app.querySelector('#authChgNewPass').value;
+      const newP2 = app.querySelector('#authChgNewPass2').value;
+      if(u.length < 2){ showToast('请输入用户名'); return; }
+      if(oldP.length < 4){ showToast('请输入旧密码'); return; }
+      if(newP.length < 4){ showToast('新密码至少 4 位'); return; }
+      if(newP !== newP2){ showToast('两次新密码不一致'); return; }
+      const r = loadRegistry();
+      const row = r.users[u];
+      if(!row){ showToast('用户不存在'); return; }
+      const oldHash = await hashPassword(row.salt, oldP);
+      if(oldHash !== row.hash){ showToast('旧密码错误'); return; }
+      const newSalt = randomSalt();
+      const newHash = await hashPassword(newSalt, newP);
+      r.users[u] = { salt: newSalt, hash: newHash };
+      saveRegistry(r);
+      showToast('密码修改成功');
+      app.querySelector('#authChgOldPass').value='';
+      app.querySelector('#authChgNewPass').value='';
+      app.querySelector('#authChgNewPass2').value='';
+    });
+  } else {
+    app.querySelector('#authRegOnlyBtn')?.addEventListener('click', async ()=>{
+      const u = normalizeUsername(app.querySelector('#authRegUserOnly').value);
+      const p = app.querySelector('#authRegPassOnly').value;
+      const p2 = app.querySelector('#authRegPassOnly2').value;
+      if(u.length < 2){ showToast('用户名至少 2 位（请用拼音/英文）'); return; }
+      if(p.length < 4){ showToast('密码至少 4 位'); return; }
+      if(p !== p2){ showToast('两次密码不一致'); return; }
+      const r = loadRegistry();
+      if(r.users[u]){ showToast('用户名已存在'); return; }
+      const salt = randomSalt();
+      const hash = await hashPassword(salt, p);
+      r.users[u] = { salt, hash };
+      saveRegistry(r);
+      let initial = emptyData();
+      const leg = localStorage.getItem(LEGACY_STORAGE_KEY);
+      if(leg){
+        try{
+          const o = JSON.parse(leg);
+          if(o && o.sessions) initial = o;
+        }catch(e){}
+        localStorage.removeItem(LEGACY_STORAGE_KEY);
+      }
+      saveUserBlob(u, initial);
+      currentUserId = u;
+      localStorage.setItem(SESSION_KEY, u);
+      data = initial;
+      tabBar.classList.remove('hidden');
+      showToast('注册成功');
+      render();
+    });
+  }
+}
+
+function logoutUser(){
+  if(!confirm('退出登录？未导出的数据仍保留在本机该账号下。')) return;
+  currentUserId = '';
+  localStorage.removeItem(SESSION_KEY);
+  data = emptyData();
+  tabBar.classList.add('hidden');
+  currentTab = 'home';
+  tabBar.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+  tabBar.querySelector('[data-tab=home]')?.classList.add('active');
+  renderAuth();
+}
+
 function render(){
+  if(!currentUserId){ renderAuth(); return; }
   if(viewingSessionId) return renderSessionDetail();
   switch(currentTab){
     case 'home': renderHome(); break;
@@ -154,6 +397,7 @@ function renderHome(){
 
   app.innerHTML = `
     <h1>🧗 萝卜大法</h1>
+    <p style="text-align:center;font-size:.8rem;color:var(--text-muted);margin:-4px 0 8px">已登录 · ${currentUserId}</p>
     ${alerts}
     <div class="status-bar">
       <div class="stat-card"><div class="num">${weekCount}</div><div class="label">本周训练</div></div>
@@ -387,7 +631,26 @@ function showRoutePickerModal(onSelect){
       <label>难度</label>
       <select id="pickerNewGrade">${GRADES.map(g=>'<option>'+g+'</option>').join('')}</select>
       <label>所在位置</label>
-      <input type="text" id="pickerNewLoc" placeholder="岩馆/区域（可选）">
+      <select id="pickerNewLocSelect">
+        <option value="">手动输入</option>
+        <option value="岩时攀登中心（西三旗）">岩时攀登中心（西三旗）</option>
+      </select>
+      <div id="pickerCustomLocWrap" class="hidden">
+        <label>自定义位置</label>
+        <input type="text" id="pickerNewLoc" placeholder="岩馆/区域（可选）">
+      </div>
+      <div id="pickerAreaWrap" class="hidden">
+        <label>线路区域</label>
+        <select id="pickerNewArea">
+          <option value="">不选择</option>
+          <option value="E区顶绳区">E区顶绳区</option>
+          <option value="A区青少年比赛区">A区青少年比赛区</option>
+          <option value="D区自动保护区">D区自动保护区</option>
+          <option value="C区先锋区">C区先锋区</option>
+          <option value="B区比赛区">B区比赛区</option>
+          <option value="速度区">速度区</option>
+        </select>
+      </div>
       <label>线路照片</label>
       <div style="display:flex;gap:8px;align-items:center">
         <input type="file" id="pickerNewImage" accept="image/*" style="display:none">
@@ -412,6 +675,14 @@ function showRoutePickerModal(onSelect){
   modal.querySelector('#pickerAddNewBtn').addEventListener('click',()=>{
     modal.querySelector('#pickerInlineAdd').classList.toggle('hidden');
   });
+  const pickerLocSelect=modal.querySelector('#pickerNewLocSelect');
+  if(pickerLocSelect){
+    pickerLocSelect.addEventListener('change',function(){
+      const val=this.value;
+      modal.querySelector('#pickerAreaWrap').classList.toggle('hidden',!val);
+      modal.querySelector('#pickerCustomLocWrap').classList.toggle('hidden',!!val);
+    });
+  }
   modal.querySelector('#pickerPhotoBtn')?.addEventListener('click',()=>{
     modal.querySelector('#pickerNewImage').click();
   });
@@ -427,7 +698,15 @@ function showRoutePickerModal(onSelect){
     const name=modal.querySelector('#pickerNewName').value.trim();
     if(!name){alert('请输入线路名称');return;}
     const grade=modal.querySelector('#pickerNewGrade').value;
-    const location=modal.querySelector('#pickerNewLoc').value.trim();
+    const locSelect=modal.querySelector('#pickerNewLocSelect').value;
+    let location='';
+    if(locSelect){
+      location=locSelect;
+      const area=modal.querySelector('#pickerNewArea').value;
+      if(area) location+=' - '+area;
+    } else {
+      location=(modal.querySelector('#pickerNewLoc')||{}).value||'';
+    }
     const imgEl=modal.querySelector('#pickerPreviewImg');
     const hasImg=!modal.querySelector('#pickerImgPreview').classList.contains('hidden')&&imgEl&&imgEl.src;
     const newRoute={id:uuid(),name,grade,location,routeNote:'',image:hasImg?imgEl.src:''};
@@ -453,13 +732,10 @@ function showAddWarmup(){
 }
 
 function showAddWarmupManual(){
-  const lib = data.routeLibrary;
-  let libOptions = lib.length ? '<label>从线路库选择</label><select id="libSelect"><option value="">-- 手动输入 --</option>'+lib.map(r=>'<option value="'+r.id+'">'+r.name+' ('+r.grade+')'+(r.location?' - '+r.location:'')+'</option>').join('')+'</select>' : '';
   const modal = document.createElement('div');
   modal.className='modal-overlay';
   modal.innerHTML=`<div class="modal">
     <h2>添加热身线路</h2>
-    ${libOptions}
     <label>线路名称</label>
     <input type="text" id="wName" placeholder="可选">
     <label>难度</label>
@@ -481,16 +757,6 @@ function showAddWarmupManual(){
       chip.classList.add('active');
     }
   });
-  const libSelect=modal.querySelector('#libSelect');
-  if(libSelect){
-    libSelect.addEventListener('change',function(){
-      const r=lib.find(x=>x.id===this.value);
-      if(r){
-        modal.querySelector('#wName').value=r.name;
-        modal.querySelector('#wGrade').value=r.grade;
-      }
-    });
-  }
   modal.querySelector('#confirmWarmupBtn').addEventListener('click',function(){
     const name=modal.querySelector('#wName').value;
     const grade=modal.querySelector('#wGrade').value;
@@ -804,7 +1070,7 @@ function renderRoutes(){
       <label>所在位置</label>
       <select id="newRouteLocation" onchange="toggleAreaSelect()">
         <option value="">手动输入</option>
-        <option value="岩石攀登中心（西三旗）">岩石攀登中心（西三旗）</option>
+        <option value="岩时攀登中心（西三旗）">岩时攀登中心（西三旗）</option>
       </select>
       <div id="customLocationWrap" class="hidden">
         <label>自定义位置</label>
@@ -984,11 +1250,17 @@ function renderStats(){
       ${topHtml}
     </div>
     <div class="card">
+      <h3>账号</h3>
+      <p style="margin-top:8px;font-size:.9rem;color:var(--text-muted)">当前用户：<strong style="color:var(--text)">${currentUserId}</strong></p>
+      <button class="btn btn-secondary btn-small" style="margin-top:10px;width:100%" onclick="logoutUser()">退出登录 / 切换账号</button>
+    </div>
+    <div class="card">
       <h3>数据管理</h3>
       <div style="display:flex;gap:8px;margin-top:8px">
         <button class="btn btn-secondary btn-small" onclick="exportData()">导出JSON</button>
         <button class="btn btn-secondary btn-small" onclick="importData()">导入数据</button>
       </div>
+      <p style="margin-top:8px;font-size:.75rem;color:var(--text-muted)">导入会覆盖<strong>当前登录用户</strong>的数据。</p>
     </div>
   `;
 }
@@ -997,7 +1269,7 @@ function exportData(){
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
-  a.href=url;a.download='luobo_training_'+today()+'.json';
+  a.href=url;a.download='luobo_training_'+currentUserId+'_'+today()+'.json';
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -1027,6 +1299,8 @@ function importData(){
 }
 
 // Initial render
+if(!currentUserId) tabBar.classList.add('hidden');
+else tabBar.classList.remove('hidden');
 render();
 </script>
 </body>
