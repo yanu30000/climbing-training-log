@@ -1050,7 +1050,10 @@ function renderRoutes(){
               <span style="font-weight:600">${r.name}</span>
               <span class="badge badge-green" style="margin-left:6px">${r.grade}</span>
             </div>
-            <button class="delete-btn" onclick="deleteRoute('${r.id}')">×</button>
+            <div style="display:flex;gap:4px">
+              <button class="btn btn-secondary btn-small" style="padding:4px 8px;min-height:28px;font-size:.75rem" onclick="editRouteItem('${r.id}')">编辑</button>
+              <button class="delete-btn" onclick="deleteRoute('${r.id}')">×</button>
+            </div>
           </div>
           ${r.location?'<div style="font-size:.8rem;color:var(--text-muted);margin-top:2px">📍 '+r.location+'</div>':''}
           ${r.routeNote?'<div style="font-size:.8rem;color:var(--text-muted);margin-top:2px">💬 '+r.routeNote+'</div>':''}
@@ -1158,6 +1161,98 @@ function deleteRoute(id){
   data.routeLibrary=data.routeLibrary.filter(r=>r.id!==id);
   saveData(data);
   render();
+}
+
+function editRouteItem(id){
+  const r=data.routeLibrary.find(x=>x.id===id);
+  if(!r)return;
+  const modal=document.createElement('div');
+  modal.className='modal-overlay';
+  modal.innerHTML=`<div class="modal">
+    <h2>编辑线路</h2>
+    <label>线路名称</label>
+    <input type="text" id="editRName" value="${r.name}">
+    <label>难度</label>
+    <select id="editRGrade">${GRADES.map(g=>'<option'+(g===r.grade?' selected':'')+'>'+g+'</option>').join('')}</select>
+    <label>所在位置</label>
+    <select id="editRLocSelect">
+      <option value="">手动输入</option>
+      <option value="岩时攀登中心（西三旗）"${r.location&&r.location.startsWith('岩时攀登中心')?' selected':''}>岩时攀登中心（西三旗）</option>
+    </select>
+    <div id="editCustomLocWrap"${r.location&&r.location.startsWith('岩时攀登中心')?' class="hidden"':''}>
+      <label>自定义位置</label>
+      <input type="text" id="editRLoc" value="${r.location&&!r.location.startsWith('岩时攀登中心')?r.location:''}">
+    </div>
+    <div id="editAreaWrap"${r.location&&r.location.startsWith('岩时攀登中心')?'':' class="hidden"'}>
+      <label>线路区域</label>
+      <select id="editRArea">
+        <option value="">不选择</option>
+        <option value="E区顶绳区"${r.location&&r.location.includes('E区顶绳区')?' selected':''}>E区顶绳区</option>
+        <option value="A区青少年比赛区"${r.location&&r.location.includes('A区青少年比赛区')?' selected':''}>A区青少年比赛区</option>
+        <option value="D区自动保护区"${r.location&&r.location.includes('D区自动保护区')?' selected':''}>D区自动保护区</option>
+        <option value="C区先锋区"${r.location&&r.location.includes('C区先锋区')?' selected':''}>C区先锋区</option>
+        <option value="B区比赛区"${r.location&&r.location.includes('B区比赛区')?' selected':''}>B区比赛区</option>
+        <option value="速度区"${r.location&&r.location.includes('速度区')?' selected':''}>速度区</option>
+      </select>
+    </div>
+    <label>备注</label>
+    <input type="text" id="editRNote" value="${r.routeNote||''}">
+    <label>线路照片</label>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input type="file" id="editRImage" accept="image/*" style="display:none">
+      <button class="btn btn-secondary btn-small" id="editRPhotoBtn">📷 更换照片</button>
+      ${r.image?'<button class="btn btn-secondary btn-small" id="editRRemoveImg" style="color:var(--red)">移除照片</button>':''}
+    </div>
+    <div id="editRImgPreview" style="margin-top:8px">${r.image?'<img id="editRPreviewImg" src="'+r.image+'" style="width:100%;max-height:160px;object-fit:contain;border-radius:8px">':'<img id="editRPreviewImg" style="width:100%;max-height:160px;object-fit:contain;border-radius:8px;display:none">'}</div>
+    <div style="margin-top:16px;display:flex;gap:8px">
+      <button class="btn btn-primary" id="saveEditRouteBtn">保存</button>
+      <button class="btn btn-secondary" id="cancelEditRouteBtn">取消</button>
+    </div>
+  </div>`;
+  let newImage=r.image||'';
+  modal.querySelector('#editRLocSelect').addEventListener('change',function(){
+    const val=this.value;
+    modal.querySelector('#editAreaWrap').classList.toggle('hidden',!val);
+    modal.querySelector('#editCustomLocWrap').classList.toggle('hidden',!!val);
+  });
+  modal.querySelector('#editRPhotoBtn').addEventListener('click',()=>{
+    modal.querySelector('#editRImage').click();
+  });
+  modal.querySelector('#editRImage').addEventListener('change',function(){
+    const file=this.files[0];if(!file)return;
+    compressImage(file,100000,result=>{
+      newImage=result;
+      const img=modal.querySelector('#editRPreviewImg');
+      img.src=result;img.style.display='block';
+    });
+  });
+  modal.querySelector('#editRRemoveImg')?.addEventListener('click',()=>{
+    newImage='';
+    const img=modal.querySelector('#editRPreviewImg');
+    img.src='';img.style.display='none';
+  });
+  modal.querySelector('#saveEditRouteBtn').addEventListener('click',()=>{
+    const name=modal.querySelector('#editRName').value.trim();
+    if(!name){alert('线路名称不能为空');return;}
+    r.name=name;
+    r.grade=modal.querySelector('#editRGrade').value;
+    const locSelect=modal.querySelector('#editRLocSelect').value;
+    if(locSelect){
+      r.location=locSelect;
+      const area=modal.querySelector('#editRArea').value;
+      if(area) r.location+=' - '+area;
+    } else {
+      r.location=modal.querySelector('#editRLoc').value.trim();
+    }
+    r.routeNote=modal.querySelector('#editRNote').value.trim();
+    r.image=newImage;
+    saveData(data);
+    modal.remove();
+    showToast('线路已更新');
+    render();
+  });
+  modal.querySelector('#cancelEditRouteBtn').addEventListener('click',()=>modal.remove());
+  document.body.appendChild(modal);
 }
 
 function renderStats(){
